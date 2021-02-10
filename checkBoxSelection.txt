@@ -1,0 +1,193 @@
+import './checkBoxSelection.scss';
+import React, { useState, useEffect } from 'react';
+
+function CheckBoxSelection(props) {
+  const [allChecked, setAllChecked] = useState(false);
+  const [data, setData] = useState(props.checkBoxData);
+  const [savedValues, setSavedValues] = useState(props.selectedData);
+  const [saveMode, setSaveMode] = useState(false);
+  const [check, setCheck] = useState(false);
+
+  /**
+   * Used use effect hook to check saved vales.
+   */
+  useEffect(() => {
+    if (savedValues.length === 0) {
+      setSaveMode(false);
+    }
+  }, [savedValues]);
+
+  /***
+   * Handle Checkbox state
+   */
+  const handleChange = (itemName, checked) => {
+    console.log(data);
+    let list = [];
+    list = saveMode ? savedValues : data;
+    if (itemName === 'checkAll') {
+      setAllChecked(checked);
+      list = list.map((item) => ({ ...item, isChecked: checked }));
+    } else {
+      list = list.map((item) =>
+        item.id.toString() === itemName
+          ? { ...item, isChecked: checked }
+          : item,
+      );
+    }
+    setAllChecked(list.every((item) => item.isChecked));
+    setCheck(list.find((item) => item.isChecked) ? true : false);
+    saveMode ? setSavedValues(list) : setData(list);
+  };
+
+  /***
+   * Create new array to create new column after 10 items.
+   */
+  const renderCheckbox = (item) => {
+    const size = 10;
+
+    const listItemsVal = item.reduce((acc, cur, i) => {
+      if (!(i % size)) {
+        acc.push(item.slice(i, i + size));
+      }
+      return acc;
+    }, []);
+    const listItems = listItemsVal.map((value, index) => {
+      return (
+        <div className='checkbox-container' key={index}>
+          {value.map((el, ind) => {
+            return ListItem(el, ind);
+          })}
+        </div>
+      );
+    });
+    return (
+      <div className='main-container locations-multiseelct px-4'>
+        {listItems}
+      </div>
+    );
+  };
+  /**
+   * Render Checkbox as per filtered data.
+   *
+   */
+  const ListItem = (item, index) => {
+    return (
+      <div className='form-check' key={item.id}>
+        <input
+          type='checkbox'
+          className='form-check-input'
+          checked={item.isChecked}
+          name={item.id}
+          onChange={(event) =>
+            handleChange(event.target.name, event.target.checked)
+          }
+          id={item.id}
+        />
+        <label className='form-check-label' htmlFor={item.id}>
+          {item.title}
+        </label>
+      </div>
+    );
+  };
+
+  /**
+   * Save selected values
+   */
+  const saveSelectedValues = () => {
+    let dataArray = JSON.parse(JSON.stringify(data));
+    setData(data.filter((el) => !el.isChecked));
+    let checkValues = dataArray.filter((el) => el.isChecked);
+    checkValues = checkValues.map((el) => {
+      el.isChecked = false;
+      return el;
+    });
+    checkValues.push(...savedValues);
+    setSavedValues(checkValues);
+    setCheck(false);
+    setSaveMode(true);
+    props.selectedDataEvent(true, checkValues);
+  };
+
+  /**
+   * Remove Selected Values
+   */
+  const removeSelectedValues = () => {
+    let removedLocation = JSON.parse(
+      JSON.stringify(savedValues.filter((el) => el.isChecked)),
+    ).map((value) => {
+      value.isChecked = false;
+      return value;
+    });
+    setData([...data, ...removedLocation]);
+    let addLocation = savedValues.filter((el) => !el.isChecked);
+    setSavedValues(addLocation);
+    setCheck(false);
+    props.selectedDataEvent(!(addLocation.length === 0), addLocation);
+  };
+
+  /**
+   * Add More Data
+   */
+  const addMore = () => {
+    setCheck(false);
+    setSaveMode(false);
+    props.selectedDataEvent(false, savedValues);
+  };
+
+  return (
+    <>
+      <div className='row'>
+        <div className='col-12 location-head-top'>
+          <button
+            className='btn select-all-btn'
+            onClick={() => {
+              handleChange('checkAll', true);
+            }}
+            disabled={allChecked}
+          >
+            <u>Select All</u>
+          </button>
+          <button
+            className='btn clear-all-btn'
+            onClick={() => handleChange('checkAll', false)}
+            disabled={!check}
+          >
+            <u>Clear All</u>
+          </button>
+          {saveMode && (
+            <button
+              className='btn clear-all-btn btn-addmore-locations'
+              onClick={addMore}
+            >
+              | <u> {props.addMoreTitle}</u>
+            </button>
+          )}
+        </div>
+      </div>
+      <div className='row'>
+        {saveMode ? renderCheckbox(savedValues) : renderCheckbox(data)}
+      </div>
+      {!saveMode ? (
+        <button
+          type='button'
+          className='btn btn-outline-success'
+          disabled={!check}
+          onClick={() => saveSelectedValues()}
+        >
+          Save
+        </button>
+      ) : (
+        <button
+          type='button'
+          className='btn btn-outline-success'
+          disabled={!check}
+          onClick={() => removeSelectedValues()}
+        >
+          REMOVE
+        </button>
+      )}
+    </>
+  );
+}
+
+export default CheckBoxSelection;

@@ -1,0 +1,377 @@
+import React, { createRef } from 'react';
+import ComponentLabel from '../../components/componentLabel/ComponentLabel';
+import FloatingLabel from '../../components/floatingLabel/FloatingLabel';
+import './AddNewBudget.scss';
+import Api from '../../api/Api';
+import axios from 'axios';
+import OutlineSucessButton from '../../components/outlineSucessButton/OutlineSucessButton';
+import CheckBoxSelection from '../../components/checkBoxSelection/CheckBoxSelection';
+import { BASE_DEV_URL } from '../../core/Config';
+class AddNewBudget extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      items: [],
+      glCodes: [],
+      isGlTab: false,
+      isLocationSelected: false,
+      isActive: false,
+      selectedLocation: [],
+      selectedGlCodes: [],
+      show: false,
+      budgetTitle: '',
+    };
+    this.focusInputRef = createRef();
+  }
+
+  componentDidMount() {
+    this.focusInputRef.current.focus();
+    /**
+     * Get Location API
+     */
+    Api.getLocation().then((result) => {
+      let data = result.data.map((el) => {
+        el.isChecked = false;
+        el.id = el.facilityID;
+        el.title = el.facilityName;
+        return el;
+      });
+      this.setState({
+        items: data,
+      });
+    });
+
+    /**
+     * Get Gl Code API
+     */
+    axios.get(`${BASE_DEV_URL}GLCodes/GetAllGLCodes`).then((result) => {
+      let data = result.data.map((el) => {
+        el.isChecked = false;
+        el.id = el.glid;
+        el.title = el.glName;
+        return el;
+      });
+      this.setState({ glCodes: data });
+    });
+  }
+
+  /**
+   * Floating label handler
+   * @param {*} event
+   */
+  handleTextChange = (event) => {
+    let text = event.currentTarget.value;
+    if (text.length > 50) {
+      return;
+    }
+
+    this.setState({ budgetTitle: text });
+    if (text !== '') {
+      this.setState({ isActive: true });
+    } else {
+      this.setState({ isActive: false });
+    }
+  };
+
+  /***
+   * Get location from API.
+   */
+  addLocation = () => {
+    let data =
+      this.state.selectedLocation.length !== 0
+        ? this.removePrevSelctedValues(
+            this.state.items,
+            this.state.selectedLocation,
+          )
+        : this.state.items;
+    this.setState({ items: data }, () => {
+      this.setState({ show: !this.state.show });
+      this.setState({ isGlTab: false });
+      this.setState({ isLocationSelected: false });
+    });
+  };
+
+  /**
+   * Get GL Codes from APi
+   */
+  getGLCode = () => {
+    let data =
+      this.state.selectedGlCodes.length !== 0
+        ? this.removePrevSelctedValues(
+            this.state.glCodes,
+            this.state.selectedGlCodes,
+          )
+        : this.state.glCodes;
+
+    this.setState({ glCodes: data }, () => {
+      this.setState({ isGlTab: true });
+      this.setState({ isLocationSelected: false });
+    });
+  };
+
+  /**
+   * Send Budget Data to server
+   */
+  sendData = () => {
+    let payload = {
+      budgetID: 0,
+      budgetName: this.state.budgetTitle,
+      budgetCode: 'B0123',
+      budgetsActive: 1,
+      budgetModifiedBy: null,
+      budgetModifiedDate: null,
+      budgetCreateBy: 1,
+      budgetCreateDate: '2021-02-04T14:54:58.487',
+    };
+    payload.budgetGLCodes = this.filterPayload(
+      this.state.selectedGlCodes,
+      'glid',
+    );
+    payload.budgetLocations = this.filterPayload(
+      this.state.selectedLocation,
+      'facilityID',
+    );
+    axios
+      .post(`${BASE_DEV_URL}Budget/SaveBudgetWithLocAndGLCode`, payload)
+      .then((data) => {
+        this.setState({
+          items: [...this.state.items, ...this.state.selectedLocation],
+        });
+        this.setState({
+          glCodes: [...this.state.glCodes, ...this.state.selectedGlCodes],
+        });
+        this.setState({ selectedLocation: [] });
+        this.setState({ selectedGlCodes: [] });
+        this.setState({ budgetTitle: '' });
+        alert('Data Saved!');
+      });
+  };
+  /**
+   * Filter Array Object by keys
+   */
+
+  filterPayload = (object, ...keys) => {
+    return object.map((data) => {
+      return keys.reduce(
+        (result, key) => ({ ...result, [key]: data[key] }),
+        {},
+      );
+    });
+  };
+
+  /**
+   * Remove Previous Selected Values from main array
+   */
+  removePrevSelctedValues = (fromArray, toArray) => {
+    return fromArray.filter((from) => toArray.every((to) => from.id !== to.id));
+  };
+
+  /****
+   * Get selected  Value from child component.
+   */
+  getSelectedData = (mode, value) => {
+    this.state.isGlTab
+      ? this.setState({ selectedGlCodes: value })
+      : this.setState({ selectedLocation: value });
+    this.setState({ isLocationSelected: mode });
+  };
+
+  render() {
+    return (
+      <section className='container-fluid add-new-budget'>
+        <ComponentLabel label='Add New Budget' />
+        <FloatingLabel
+          label='Budget Title'
+          ref={this.focusInputRef}
+          floatingLabelHandler={this.handleTextChange}
+          isActive={this.state.isActive}
+          value={this.state.budgetTitle}
+        />
+
+        <div className='' id='tabs'>
+          <div className='row'>
+            <div className='col-12 '>
+              <nav>
+                <div
+                  className='nav nav-tabs nav-fill'
+                  id='nav-tab'
+                  role='tablist'
+                >
+                  <a
+                    className='nav-item nav-link active'
+                    id='nav-location-tab'
+                    data-toggle='tab'
+                    href='#nav-location'
+                    role='tab'
+                    aria-controls='nav-location'
+                    aria-selected='true'
+                    onClick={() => {
+                      this.setState({ show: false });
+                      this.setState({ currentTab: 'location' });
+                    }}
+                  >
+                    Locations
+                  </a>
+                  <a
+                    className='nav-item nav-link'
+                    id='nav-GL-code-tab'
+                    data-toggle='tab'
+                    href='#nav-GL-code'
+                    role='tab'
+                    onClick={() => {
+                      this.setState({ isGlTab: false });
+                      this.setState({ currentTab: 'glCode' });
+                    }}
+                    aria-controls='nav-GL-code'
+                    aria-selected='false'
+                  >
+                    GL Codes
+                  </a>
+                </div>
+              </nav>
+
+              <div
+                className='tab-content py-3 px-3 px-sm-0 col-12'
+                id='nav-tabContent'
+              >
+                <div
+                  className='tab-pane fade show active'
+                  id='nav-location'
+                  role='tabpanel'
+                  aria-labelledby='nav-location-tab'
+                >
+                  {!this.state.show ? (
+                    <section className='add-loation-tab'>
+                      <div>
+                        <p>Please select applicable locations </p>
+                        <button
+                          type='button'
+                          className='btn btn-outline-success btn-add-locations'
+                          onClick={() => this.addLocation()}
+                        >
+                          Add Locations
+                        </button>
+                      </div>
+                    </section>
+                  ) : (
+                    <section className='select-location-tab '>
+                      <div className='row'>
+                        <div className='col-12 px-4 location-head-top'>
+                          <label className='float-left location-head-label'>
+                            {this.state.isLocationSelected ? (
+                              <>
+                                My Locations{' '}
+                                <span>
+                                  {this.state.selectedLocation.length}
+                                </span>
+                              </>
+                            ) : (
+                              'Select to add locations'
+                            )}
+                          </label>
+                          <button
+                            type='button'
+                            className='close float-right'
+                            aria-label='Close'
+                            onClick={() =>
+                              this.setState({ show: !this.state.show })
+                            }
+                          >
+                            <span aria-hidden='true'>&times;</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <CheckBoxSelection
+                        selectedData={this.state.selectedLocation}
+                        checkBoxData={this.state.items}
+                        addMoreTitle='Add More Locations'
+                        selectedDataEvent={this.getSelectedData}
+                      />
+                    </section>
+                  )}
+                </div>
+                {/* Gl Tab */}
+                <div
+                  className='tab-pane fade'
+                  id='nav-GL-code'
+                  role='tabpanel'
+                  aria-labelledby='nav-GL-code-tab'
+                >
+                  {!this.state.isGlTab && (
+                    <section className='add-loation-tab'>
+                      <div>
+                        <p>Please select applicable GL Codes </p>
+                        <OutlineSucessButton
+                          className='btn-add-locations btn-add-gl-code'
+                          handleOutlineBtn={this.getGLCode}
+                          buttonTitle='Add Gl Codes'
+                        />
+                      </div>
+                    </section>
+                  )}
+                  {this.state.isGlTab && (
+                    <section className='select-location-tab '>
+                      <div className='row'>
+                        <div className='col-12 px-4 location-head-top'>
+                          <label className='float-left location-head-label'>
+                            {this.state.isLocationSelected ? (
+                              <>
+                                My GL Codes{' '}
+                                <span>{this.state.selectedGlCodes.length}</span>
+                              </>
+                            ) : (
+                              'Select to add GL Codes'
+                            )}
+                          </label>
+                          <button
+                            type='button'
+                            className='close float-right'
+                            aria-label='Close'
+                            onClick={() =>
+                              this.setState({ isGlTab: !this.state.isGlTab })
+                            }
+                          >
+                            <span aria-hidden='true'>&times;</span>
+                          </button>
+                        </div>
+                      </div>
+                      <CheckBoxSelection
+                        selectedData={this.state.selectedGlCodes}
+                        checkBoxData={this.state.glCodes}
+                        addMoreTitle='Add More GL Codes'
+                        selectedDataEvent={this.getSelectedData}
+                      />
+                    </section>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className='col-12'>
+              <button type='button' className='btn btn-outline-success mr-1'>
+                Cancel
+              </button>
+              <button
+                className='btn btn-submit'
+                type='submit'
+                disabled={
+                  !(
+                    this.state.budgetTitle.length > 0 &&
+                    this.state.selectedLocation.length > 0 &&
+                    this.state.selectedGlCodes.length > 0
+                  )
+                }
+                onClick={() => {
+                  this.sendData();
+                }}
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+}
+export default AddNewBudget;
